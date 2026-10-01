@@ -9,14 +9,16 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "aframe": "1.5.0",
     "mind-ar": "1.2.5",
     "qrcode": "1.5.4",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
