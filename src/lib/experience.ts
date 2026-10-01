@@ -14,7 +14,8 @@ export function isSafeDestinationUrl(value: string): boolean {
 export function isSafeAssetUrl(value: string): boolean {
   try {
     const url = new URL(value, window.location.origin);
-    return HTTP_PROTOCOLS.has(url.protocol) || url.protocol === "data:";
+    return HTTP_PROTOCOLS.has(url.protocol)
+      || (url.protocol === "data:" && value.toLowerCase().startsWith("data:image/"));
   } catch {
     return false;
   }
