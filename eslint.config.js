@@ -8,5 +8,5 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
-  reactRefresh.configs.vite(),
+  reactRefresh.configs.vite,
 );
