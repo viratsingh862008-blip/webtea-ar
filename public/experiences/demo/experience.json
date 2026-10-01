@@ -1,0 +1,11 @@
+{
+  "id": "demo",
+  "title": "WebTea AR",
+  "subtitle": "A QR-launched floating experience.",
+  "imageUrl": "/experiences/demo/card.svg",
+  "destinationUrl": "https://example.com/",
+  "mode": "qr",
+  "theme": "editorial",
+  "ctaLabel": "Open experience",
+  "fallbackEnabled": true
+}
