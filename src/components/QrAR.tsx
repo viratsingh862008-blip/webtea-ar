@@ -27,8 +27,9 @@ export function QrAR({ experience }: QrARProps) {
   }, []);
 
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
-      const stream = videoRef.current?.srcObject;
+      const stream = video?.srcObject;
       stopCamera(stream instanceof MediaStream ? stream : null);
     };
   }, []);
