@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
+import { zipSync } from "fflate";
 import type { ARMode, ExperienceConfig } from "../types/experience";
-import { buildStudioUrl, canGenerateQr } from "../lib/studio";
+import { buildPublishedUrl, buildStudioUrl, canGenerateQr } from "../lib/studio";
 import { createQrDataUrl } from "../lib/qr";
 
 const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=900&q=85";
 const DEFAULT_DESTINATION = "https://example.com/";
 
-function downloadText(filename: string, value: string): void {
-  const blob = new Blob([value], { type: "application/json;charset=utf-8" });
+function downloadBlob(filename: string, value: BlobPart, type: string): void {
+  const blob = new Blob([value], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -16,12 +17,28 @@ function downloadText(filename: string, value: string): void {
   URL.revokeObjectURL(url);
 }
 
+function downloadText(filename: string, value: string): void {
+  downloadBlob(filename, value, "application/json;charset=utf-8");
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(",")[1] ?? "";
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function extensionForFile(file: File): string {
+  const subtype = file.type.split("/")[1]?.toLowerCase();
+  return subtype === "jpeg" ? "jpg" : (subtype || "bin").replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
+}
+
 export function Studio() {
+  const [baseUrl, setBaseUrl] = useState(window.location.origin);
   const [config, setConfig] = useState<ExperienceConfig>({
     id: "menu-01",
     title: "Your AR Menu",
     subtitle: "Tap the floating image to continue.",
-    imageUrl: DEFAULT_IMAGE,
+    imageUrl: "/experiences/menu-01/card.webp",
     destinationUrl: DEFAULT_DESTINATION,
     mode: "qr",
     theme: "editorial",
@@ -29,50 +46,25 @@ export function Studio() {
     fallbackEnabled: true,
   });
   const [imagePreview, setImagePreview] = useState(DEFAULT_IMAGE);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [targetFile, setTargetFile] = useState<File | null>(null);
   const [qr, setQr] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
-  const experienceUrl = useMemo(
-    () => buildStudioUrl(window.location.origin, { ...config, id: config.id || "experience" }),
-    [config],
+  const publishedUrl = useMemo(
+    () => buildPublishedUrl(baseUrl.replace(/\/$/, ""), config.id || "experience"),
+    [baseUrl, config.id],
   );
-
-  const qrReady = canGenerateQr(config, experienceUrl);
-
-  async function generateQr() {
-    if (!qrReady) {
-      setError("Use a public image URL, valid destination URL, and a compact experience URL before generating the QR.");
-      setQr("");
-      return;
-    }
-    try {
-      setError("");
-      setQr(await createQrDataUrl(experienceUrl));
-      setStatus("QR generated.");
-    } catch {
-      setError("QR generation failed.");
-    }
-  }
-
-  function handleImageFile(file: File | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose a JPG, PNG, WebP, or other browser-supported image.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setImagePreview(reader.result);
-        setConfig((current) => ({ ...current, imageUrl: reader.result as string }));
-        setQr("");
-        setStatus("Local image loaded for preview.");
-      }
-    };
-    reader.readAsDataURL(file);
-  }
+  const previewUrl = useMemo(
+    () => buildStudioUrl(window.location.origin, {
+      ...config,
+      imageUrl: imagePreview,
+      id: config.id || "experience",
+    }),
+    [config, imagePreview],
+  );
+  const qrReady = canGenerateQr(config, publishedUrl);
 
   function update<K extends keyof ExperienceConfig>(key: K, value: ExperienceConfig[K]) {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -81,12 +73,113 @@ export function Studio() {
     setStatus("");
   }
 
-  function downloadConfig() {
-    downloadText(
-      `${config.id || "webtea-ar"}-experience.json`,
-      JSON.stringify({ ...config, generatedAt: new Date().toISOString() }, null, 2),
-    );
-    setStatus("Configuration downloaded.");
+  async function generateQr() {
+    if (!qrReady) {
+      setError("Use a valid public base URL, image URL/path, destination URL, and required target asset.");
+      setQr("");
+      return;
+    }
+    try {
+      setError("");
+      setQr(await createQrDataUrl(publishedUrl));
+      setStatus("QR generated with the compact /ar/<slug> URL.");
+    } catch {
+      setError("QR generation failed.");
+    }
+  }
+
+  function handleImageFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        const extension = extensionForFile(file);
+        setImageFile(file);
+        setImagePreview(reader.result);
+        update("imageUrl", `/experiences/${config.id || "experience"}/card.${extension}`);
+        setStatus("Image loaded. It will be included in the deployment ZIP.");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleTargetFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".mind")) {
+      setError("Image-target mode requires a .mind file generated by the MindAR Target Compiler.");
+      return;
+    }
+
+    setTargetFile(file);
+    update("targetUrl", `/experiences/${config.id || "experience"}/target.mind`);
+    setStatus("MindAR target loaded. It will be included in the deployment ZIP.");
+  }
+
+  function downloadPack() {
+    setError("");
+    if (!imageFile) {
+      setError("Upload the experience image before exporting a deployment ZIP.");
+      return;
+    }
+    if (config.mode === "image-target" && !targetFile) {
+      setError("Image-target mode needs the .mind target file.");
+      return;
+    }
+
+    const slug = (config.id || "experience").trim();
+    const manifest = {
+      ...config,
+      id: slug,
+      imageUrl: config.imageUrl,
+      ...(config.mode === "image-target" ? { targetUrl: `/experiences/${slug}/target.mind` } : {}),
+    };
+
+    const entries: Record<string, Uint8Array> = {
+      [`public/experiences/${slug}/experience.json`]: new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
+      [`public/experiences/${slug}/${imageFile.name`]: new Uint8Array(),
+      "WEBTEA-AR-DEPLOY.txt": new TextEncoder().encode(
+        [
+          "WEBTEA AR DEPLOY PACK",
+          "",
+          `Experience: ${slug}`,
+          `AR URL: ${publishedUrl}`,
+          "",
+          "Unzip this pack at the root of the webtea-ar repository.",
+          "Then commit and deploy. The QR only contains the short /ar/<slug> URL.",
+          config.mode === "image-target"
+            ? "Image-target mode: target.mind is included and must be reachable at the same deployed origin."
+            : "QR camera mode: the image appears as a floating camera overlay after the QR is opened.",
+        ].join("\n"),
+      ),
+    };
+
+    // Replace the placeholder asset path with a normalized filename.
+    delete entries[`public/experiences/${slug}/${imageFile.name`];
+    const extension = extensionForFile(imageFile);
+    entries[`public/experiences/${slug}/card.${extension}`] = new Uint8Array();
+    if (config.mode === "image-target" && targetFile) {
+      entries[`public/experiences/${slug}/target.mind`] = new Uint8Array();
+    }
+    if (qr) {
+      entries[`public/qr/${slug}-qr.png`] = dataUrlToBytes(qr);
+    }
+
+    Promise.all([
+      imageFile.arrayBuffer(),
+      config.mode === "image-target" && targetFile ? targetFile.arrayBuffer() : Promise.resolve(null),
+    ]).then(([imageBytes, targetBytes]) => {
+      const finalEntries = { ...entries };
+      finalEntries[`public/experiences/${slug}/card.${extension}`] = new Uint8Array(imageBytes);
+      if (targetBytes) finalEntries[`public/experiences/${slug}/target.mind`] = new Uint8Array(targetBytes);
+      const archive = zipSync(finalEntries, { level: 6 });
+      downloadBlob(`${slug}-webtea-ar-deploy.zip`, archive, "application/zip");
+      setStatus("Deployment ZIP generated. Unzip it at the repository root, commit, and deploy.");
+    }).catch(() => setError("Could not package the deployment ZIP."));
   }
 
   return (
@@ -96,18 +189,25 @@ export function Studio() {
           <p className="eyebrow">WEBTEA HQ · AR STUDIO</p>
           <h1>Build a QR → AR experience.</h1>
           <p className="home-card__copy">
-            Configure an experience, preview it, generate its share URL, and export
-            the configuration. The engine itself stays self-hosted and free.
+            Upload the card image, attach the destination URL, generate a compact
+            QR, and export a ready-to-deploy asset pack. Everything after deployment
+            is static and can run on Vercel's free tier.
           </p>
         </header>
 
         <div className="studio-grid">
           <section className="panel">
-            <h2>Experience</h2>
+            <h2>Experience setup</h2>
+
+            <div className="field">
+              <label htmlFor="base-url">Public base URL</label>
+              <input id="base-url" type="url" placeholder="https://your-project.vercel.app" value={baseUrl} onChange={(e) => { setBaseUrl(e.target.value); setQr(""); }} />
+              <div className="note">Use the final HTTPS domain that will be printed in the QR code.</div>
+            </div>
 
             <div className="field">
               <label htmlFor="experience-id">Experience ID</label>
-              <input id="experience-id" value={config.id} onChange={(e) => update("id", e.target.value.replace(/[^a-zA-Z0-9-_]/g, "-"))} />
+              <input id="experience-id" value={config.id} onChange={(e) => update("id", e.target.value.replace(/[^a-zA-Z0-9_-]/g, "-"))} />
             </div>
 
             <div className="field">
@@ -128,39 +228,39 @@ export function Studio() {
             <div className="field">
               <label>AR mode</label>
               <select value={config.mode} onChange={(e) => update("mode", e.target.value as ARMode)}>
-                <option value="qr">QR camera AR</option>
-                <option value="image-target">Image-tracked AR</option>
+                <option value="qr">QR camera AR · no target file</option>
+                <option value="image-target">Image-tracked AR · true tracking</option>
               </select>
             </div>
 
             <div className="field">
-              <label htmlFor="image-url">Image URL</label>
-              <input id="image-url" type="url" placeholder="https://cdn.example.com/card.webp" value={config.imageUrl.startsWith("data:") ? "" : config.imageUrl} onChange={(e) => { update("imageUrl", e.target.value); setImagePreview(e.target.value || DEFAULT_IMAGE); }} />
+              <label htmlFor="image-file">Experience image</label>
+              <div className="file-drop">
+                <input id="image-file" type="file" accept="image/*" onChange={(e) => handleImageFile(e.target.files?.[0])} />
+                <label htmlFor="image-file" className="ui-button">Upload image</label>
+                <div className="note">{imageFile ? imageFile.name : "Your uploaded image becomes card.webp/jpg/png inside the deployment pack."}</div>
+              </div>
             </div>
 
             <div className="field">
-              <label htmlFor="image-file">Upload image for preview</label>
-              <div className="file-drop">
-                <input id="image-file" type="file" accept="image/*" onChange={(e) => handleImageFile(e.target.files?.[0])} />
-                <label htmlFor="image-file" className="ui-button">Choose image</label>
-                <div className="note">An uploaded local file is preview-only until you host it at a public URL.</div>
-              </div>
+              <label htmlFor="image-url">Or use a public image URL</label>
+              <input id="image-url" type="url" value={imageFile ? "" : config.imageUrl} onChange={(e) => { setImageFile(null); setImagePreview(e.target.value || DEFAULT_IMAGE); update("imageUrl", e.target.value); }} />
             </div>
 
             {config.mode === "image-target" ? (
               <div className="field">
-                <label htmlFor="target-url">MindAR .mind target URL</label>
-                <input id="target-url" type="url" placeholder="https://your-domain.com/targets/menu.mind" value={config.targetUrl ?? ""} onChange={(e) => update("targetUrl", e.target.value)} />
+                <label htmlFor="target-file">MindAR target (.mind)</label>
+                <div className="file-drop">
+                  <input id="target-file" type="file" accept=".mind,application/octet-stream" onChange={(e) => handleTargetFile(e.target.files?.[0])} />
+                  <label htmlFor="target-file" className="ui-button">Upload .mind target</label>
+                  <div className="note">{targetFile ? targetFile.name : "Generate this from the MindAR Target Compiler."}</div>
+                </div>
               </div>
             ) : null}
 
             <div className="home-links">
-              <button className="ui-button ui-button--primary" type="button" onClick={generateQr} disabled={!qrReady}>
-                Generate QR
-              </button>
-              <button className="ui-button" type="button" onClick={downloadConfig}>
-                Export config
-              </button>
+              <button className="ui-button ui-button--primary" type="button" onClick={generateQr} disabled={!qrReady}>Generate QR</button>
+              <button className="ui-button" type="button" onClick={downloadPack} disabled={!imageFile}>Download deployment ZIP</button>
             </div>
 
             {status ? <p className="note">{status}</p> : null}
@@ -168,14 +268,19 @@ export function Studio() {
           </section>
 
           <section className="panel">
-            <h2>Preview & publish</h2>
+            <h2>Preview & QR</h2>
             <div className="preview-stage">
-              <img className="preview-card" src={imagePreview} alt="AR experience preview" />
+              <img className="preview-card" src={imagePreview} alt="AR experience preview" onError={(event) => { event.currentTarget.src = DEFAULT_IMAGE; }} />
             </div>
 
-            <p className="note">Share URL</p>
+            <p className="note">Published URL</p>
             <div className="field">
-              <input readOnly value={experienceUrl} aria-label="Share URL" />
+              <input readOnly value={publishedUrl} aria-label="Published URL" />
+            </div>
+
+            <p className="note">Query preview URL (for testing public image URLs)</p>
+            <div className="field">
+              <input readOnly value={previewUrl} aria-label="Query preview URL" />
             </div>
 
             {qr ? (
@@ -185,15 +290,12 @@ export function Studio() {
               </div>
             ) : (
               <p className="note">
-                QR generation is intentionally blocked for oversized URLs and local
-                file data URLs. For client deployment, host the image and keep the
-                QR payload compact.
+                Generate the QR after setting the final base URL. The production QR is
+                intentionally tiny because it contains only <code>/ar/&lt;slug&gt;</code>.
               </p>
             )}
 
-            <a className="ui-link" href={experienceUrl} target="_blank" rel="noreferrer">
-              Open experience URL
-            </a>
+            <a className="ui-link" href={previewUrl} target="_blank" rel="noreferrer">Open query preview</a>
           </section>
         </div>
       </div>
