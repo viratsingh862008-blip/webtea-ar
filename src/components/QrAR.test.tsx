@@ -31,8 +31,8 @@ describe("QrAR fallback", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeTruthy();
-      expect(screen.getByRole("link", { name: "Open linked experience" }))
-        .toHaveAttribute("href", "https://example.com/menu");
+      expect(screen.getByRole("link", { name: "Open linked experience" }).getAttribute("href"))
+        .toBe("https://example.com/menu");
     });
   });
 });
