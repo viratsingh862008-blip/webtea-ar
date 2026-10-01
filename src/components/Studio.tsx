@@ -18,10 +18,6 @@ function downloadBlob(filename: string, value: BlobPart, type: string): void {
   URL.revokeObjectURL(url);
 }
 
-function downloadText(filename: string, value: string): void {
-  downloadBlob(filename, value, "application/json;charset=utf-8");
-}
-
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.split(",")[1] ?? "";
   const binary = atob(base64);
