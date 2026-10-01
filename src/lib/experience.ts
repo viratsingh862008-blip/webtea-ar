@@ -50,14 +50,22 @@ export function normalizeExperience(
   source: ExperienceRuntimeConfig["source"],
 ): ExperienceRuntimeConfig {
   if (!config.id.trim()) throw new Error("Experience id is required.");
+  if (config.mode !== "qr" && config.mode !== "image-target") {
+    throw new Error("Unsupported AR mode.");
+  }
   if (!isSafeDestinationUrl(config.destinationUrl)) {
     throw new Error("Destination URL must be a valid HTTP(S) URL.");
   }
   if (!isSafeAssetUrl(config.imageUrl)) {
     throw new Error("Image URL must be a valid HTTP(S) or data URL.");
   }
-  if (config.mode === "image-target" && !config.targetUrl) {
-    throw new Error("Image-target mode requires a .mind target URL.");
+  if (config.mode === "image-target") {
+    if (!config.targetUrl) {
+      throw new Error("Image-target mode requires a .mind target URL.");
+    }
+    if (!isSafeAssetUrl(config.targetUrl)) {
+      throw new Error("Image target URL must be a safe HTTP(S) or same-origin asset URL.");
+    }
   }
 
   return {
