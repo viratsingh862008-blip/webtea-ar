@@ -1,5 +1,5 @@
 import type { ExperienceConfig } from "../types/experience";
-import { buildQueryExperienceUrl, isSafeAssetUrl, isSafeDestinationUrl } from "./experience";
+import { buildExperienceUrl, buildQueryExperienceUrl, isSafeAssetUrl, isSafeDestinationUrl } from "./experience";
 
 export function canGenerateQr(
   config: Pick<ExperienceConfig, "imageUrl" | "destinationUrl" | "mode" | "targetUrl">,
@@ -17,4 +17,8 @@ export function buildStudioUrl(
   config: Pick<ExperienceConfig, "id" | "title" | "imageUrl" | "destinationUrl" | "mode" | "targetUrl">,
 ): string {
   return buildQueryExperienceUrl(origin, config);
+}
+
+export function buildPublishedUrl(origin: string, experienceId: string): string {
+  return buildExperienceUrl(origin, experienceId);
 }
