@@ -8,6 +8,7 @@ export function canGenerateQr(
   const targetReady = config.mode !== "image-target" || Boolean(config.targetUrl);
   return isSafeAssetUrl(config.imageUrl)
     && isSafeDestinationUrl(config.destinationUrl)
+    && isSafeDestinationUrl(experienceUrl)
     && targetReady
     && experienceUrl.length <= 1800;
 }
