@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ExperienceRuntimeConfig } from "../types/experience";
+import {
+  AFRAME_RUNTIME_URL,
+  loadExternalScript,
+  MINDAR_IMAGE_AFRAME_RUNTIME_URL,
+} from "../lib/cdn";
 
 interface ImageTargetARProps {
   experience: ExperienceRuntimeConfig;
@@ -12,18 +17,22 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
 
   useEffect(() => {
     let disposed = false;
-    let scene: HTMLElement | null = null;
+    let scene: (HTMLElement & {
+      systems?: Record<string, { stop?: () => void }>;
+    }) | null = null;
 
     const mount = async () => {
       try {
-        if (!experience.targetUrl) throw new Error("No MindAR target has been configured.");
+        if (!experience.targetUrl) {
+          throw new Error("No MindAR target has been configured.");
+        }
 
-        await import("aframe");
-        await import("mind-ar/dist/mindar-image-aframe.prod.js");
+        await loadExternalScript(AFRAME_RUNTIME_URL);
+        await loadExternalScript(MINDAR_IMAGE_AFRAME_RUNTIME_URL);
 
         if (disposed || !hostRef.current) return;
 
-        scene = document.createElement("a-scene");
+        scene = document.createElement("a-scene") as typeof scene;
         scene.setAttribute(
           "mindar-image",
           [
@@ -36,7 +45,10 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
           ].join("; "),
         );
         scene.setAttribute("color-space", "sRGB");
-        scene.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: true");
+        scene.setAttribute(
+          "renderer",
+          "colorManagement: true; physicallyCorrectLights: true",
+        );
         scene.setAttribute("vr-mode-ui", "enabled: false");
         scene.setAttribute("device-orientation-permission-ui", "enabled: false");
         scene.setAttribute("embedded", "true");
@@ -64,19 +76,27 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
         backing.setAttribute("position", "0 0 -0.025");
         backing.setAttribute("width", "0.82");
         backing.setAttribute("height", "1.08");
-        backing.setAttribute("material", "color: #0b0b09; opacity: 0.82; shader: flat; transparent: true");
+        backing.setAttribute(
+          "material",
+          "color: #0b0b09; opacity: 0.82; shader: flat; transparent: true",
+        );
 
         const card = document.createElement("a-plane");
         card.classList.add("ar-clickable");
         card.setAttribute("position", "0 0 0.04");
         card.setAttribute("width", "0.76");
         card.setAttribute("height", "1");
-        card.setAttribute("material", "src: #ar-target-card; shader: flat; transparent: true");
+        card.setAttribute(
+          "material",
+          "src: #ar-target-card; shader: flat; transparent: true",
+        );
         card.setAttribute(
           "animation__float",
           "property: position; to: 0 0.035 0.04; dir: alternate; dur: 1700; loop: true; easing: easeInOutSine",
         );
-        card.addEventListener("click", () => window.location.assign(experience.destinationUrl));
+        card.addEventListener("click", () =>
+          window.location.assign(experience.destinationUrl),
+        );
 
         target.appendChild(backing);
         target.appendChild(card);
@@ -91,7 +111,9 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
         scene.addEventListener("arError", () => {
           if (!disposed) {
             setStatus("error");
-            setError("AR camera initialization failed. Check camera permission and target hosting.");
+            setError(
+              "AR camera initialization failed. Check camera permission and target hosting.",
+            );
           }
         });
         target.addEventListener("targetFound", () => {
@@ -103,7 +125,11 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
       } catch (cause) {
         if (!disposed) {
           setStatus("error");
-          setError(cause instanceof Error ? cause.message : "Unable to initialize image-tracked AR.");
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Unable to initialize image-tracked AR.",
+          );
         }
       }
     };
@@ -112,25 +138,23 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
 
     return () => {
       disposed = true;
-      try {
-        const system = (scene as (HTMLElement & {
-          systems?: Record<string, { stop?: () => void }>;
-        } | null))?.systems?.["mindar-image-system"];
-        system?.stop?.();
-      } catch {
-        // MindAR may already have released camera resources.
-      }
+      scene?.systems?.["mindar-image-system"]?.stop?.();
       scene?.remove();
     };
-  }, [experience.destinationUrl, experience.imageUrl, experience.targetUrl]);
+  }, [
+    experience.destinationUrl,
+    experience.imageUrl,
+    experience.targetUrl,
+  ]);
 
-  const stateText = status === "found"
-    ? "Target found · tap the image"
-    : status === "scanning"
-      ? "Point the camera at the target image"
-      : status === "loading"
-        ? "Starting AR…"
-        : "AR could not start";
+  const stateText =
+    status === "found"
+      ? "Target found · tap the image"
+      : status === "scanning"
+        ? "Point the camera at the target image"
+        : status === "loading"
+          ? "Starting AR…"
+          : "AR could not start";
 
   return (
     <main className="ar-shell ar-shell--target">
@@ -138,7 +162,14 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
       <div className="ar-ui">
         <div className="ar-top">
           <span className="ar-brand">WebTea AR · Image Tracking</span>
-          <button className="ar-close" type="button" onClick={() => window.history.back()} aria-label="Close AR">×</button>
+          <button
+            className="ar-close"
+            type="button"
+            onClick={() => window.history.back()}
+            aria-label="Close AR"
+          >
+            ×
+          </button>
         </div>
 
         <div className="ar-center">
@@ -147,10 +178,18 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
               <p className="eyebrow">AR ERROR</p>
               <h2>We could not start this experience.</h2>
               <p>{error}</p>
-              <a className="ui-link ui-button--primary" href={experience.destinationUrl}>Open destination</a>
+              <a
+                className="ui-link ui-button--primary"
+                href={experience.destinationUrl}
+              >
+                Open destination
+              </a>
             </section>
           ) : (
-            <div className={`ar-hint ${status === "found" ? "is-hidden" : ""}`} aria-live="polite">
+            <div
+              className={`ar-hint ${status === "found" ? "is-hidden" : ""}`}
+              aria-live="polite"
+            >
               {stateText}
             </div>
           )}
@@ -158,9 +197,15 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
 
         <div className="ar-bottom">
           <div className="ar-title">{experience.title}</div>
-          {experience.subtitle ? <div className="ar-subtitle">{experience.subtitle}</div> : null}
+          {experience.subtitle ? (
+            <div className="ar-subtitle">{experience.subtitle}</div>
+          ) : null}
           {status === "found" ? (
-            <button className="ar-cta" type="button" onClick={() => window.location.assign(experience.destinationUrl)}>
+            <button
+              className="ar-cta"
+              type="button"
+              onClick={() => window.location.assign(experience.destinationUrl)}
+            >
               {experience.ctaLabel ?? "Tap to open"}
             </button>
           ) : null}
