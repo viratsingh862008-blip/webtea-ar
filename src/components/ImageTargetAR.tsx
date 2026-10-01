@@ -113,7 +113,9 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
     return () => {
       disposed = true;
       try {
-        const system = scene?.systems?.["mindar-image-system"] as { stop?: () => void } | undefined;
+        const system = (scene as (HTMLElement & {
+          systems?: Record<string, { stop?: () => void }>;
+        } | null))?.systems?.["mindar-image-system"];
         system?.stop?.();
       } catch {
         // MindAR may already have released camera resources.
