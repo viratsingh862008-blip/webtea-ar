@@ -6,6 +6,6 @@ describe("WebTea AR landing page", () => {
   it("explains the scan-to-AR experience", () => {
     render(<App />);
     expect(screen.getByRole("heading", { name: /webtea ar/i })).toBeTruthy();
-    expect(screen.getByText(/scan.*experience/i)).toBeTruthy();
+    expect(screen.getByText(/physical things can open digital experiences/i)).toBeTruthy();
   });
 });
