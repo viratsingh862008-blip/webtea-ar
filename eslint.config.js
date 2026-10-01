@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   { ignores: ["dist", "node_modules"] },
   js.configs.recommended,
-  tseslint.configs.recommended,
-  reactHooks.configs["recommended-latest"],
-  reactRefresh.configs.vite,
+  ...tseslint.configs.recommended,
+  reactHooks.configs.flat.recommended,
+  reactRefresh.configs.vite(),
 );
