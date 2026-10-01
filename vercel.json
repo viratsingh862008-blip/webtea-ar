@@ -1,0 +1,8 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/ar/:path*", "destination": "/index.html" },
+    { "source": "/studio", "destination": "/index.html" },
+    { "source": "/studio/", "destination": "/index.html" }
+  ]
+}
