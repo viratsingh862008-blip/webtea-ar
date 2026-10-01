@@ -99,10 +99,23 @@ export function QrAR({ experience }: QrARProps) {
                 Start the camera to reveal the interactive floating image. Tap the image
                 to open the linked experience.
               </p>
-              {error ? <p className="error">{error}</p> : null}
-              <button className="ui-button ui-button--primary" type="button" onClick={start} disabled={status === "starting"}>
-                {status === "starting" ? "Starting camera…" : "Start AR"}
-              </button>
+              {error ? (
+                <>
+                  <p className="error" role="alert">{error}</p>
+                  <a
+                    className="ui-link"
+                    href={experience.destinationUrl}
+                    aria-label="Open linked experience"
+                  >
+                    Open linked experience
+                  </a>
+                </>
+              ) : null}
+              {status !== "error" ? (
+                <button className="ui-button ui-button--primary" type="button" onClick={start} disabled={status === "starting"}>
+                  {status === "starting" ? "Starting camera…" : "Start AR"}
+                </button>
+              ) : null}
             </section>
           )}
         </div>
