@@ -5,7 +5,9 @@ export function loadExternalScript(src: string): Promise<void> {
   if (existing) return existing;
 
   const promise = new Promise<void>((resolve, reject) => {
-    const current = document.querySelector(`script[src="${CSS.escape(src)}"]`) as HTMLScriptElement | null;
+    const current = Array.from(document.scripts).find(
+      (script) => script.src === src || script.getAttribute("src") === src,
+    ) ?? null;
     if (current) {
       if (current.dataset.loaded === "true") {
         resolve();
