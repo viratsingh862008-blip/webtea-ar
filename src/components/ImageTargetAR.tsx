@@ -32,8 +32,11 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
 
         if (disposed || !hostRef.current) return;
 
-        scene = document.createElement("a-scene") as typeof scene;
-        scene.setAttribute(
+        const sceneElement = document.createElement("a-scene") as HTMLElement & {
+          systems?: Record<string, { stop?: () => void }>;
+        };
+        scene = sceneElement;
+        sceneElement.setAttribute(
           "mindar-image",
           [
             `imageTargetSrc: ${experience.targetUrl}`,
@@ -44,14 +47,14 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
             "uiError: no",
           ].join("; "),
         );
-        scene.setAttribute("color-space", "sRGB");
-        scene.setAttribute(
+        sceneElement.setAttribute("color-space", "sRGB");
+        sceneElement.setAttribute(
           "renderer",
           "colorManagement: true; physicallyCorrectLights: true",
         );
-        scene.setAttribute("vr-mode-ui", "enabled: false");
-        scene.setAttribute("device-orientation-permission-ui", "enabled: false");
-        scene.setAttribute("embedded", "true");
+        sceneElement.setAttribute("vr-mode-ui", "enabled: false");
+        sceneElement.setAttribute("device-orientation-permission-ui", "enabled: false");
+        sceneElement.setAttribute("embedded", "true");
 
         const assets = document.createElement("a-assets");
         const image = document.createElement("img");
@@ -100,15 +103,15 @@ export function ImageTargetAR({ experience }: ImageTargetARProps) {
 
         target.appendChild(backing);
         target.appendChild(card);
-        scene.appendChild(assets);
-        scene.appendChild(camera);
-        scene.appendChild(target);
-        hostRef.current.appendChild(scene);
+        sceneElement.appendChild(assets);
+        sceneElement.appendChild(camera);
+        sceneElement.appendChild(target);
+        hostRef.current.appendChild(sceneElement);
 
-        scene.addEventListener("arReady", () => {
+        sceneElement.addEventListener("arReady", () => {
           if (!disposed) setStatus("scanning");
         });
-        scene.addEventListener("arError", () => {
+        sceneElement.addEventListener("arError", () => {
           if (!disposed) {
             setStatus("error");
             setError(
