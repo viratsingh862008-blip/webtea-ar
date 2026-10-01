@@ -85,9 +85,6 @@ export function QrAR({ experience }: QrARProps) {
             <button
               ref={cardRef}
               className="ar-card-button"
-              style={{
-                transform: "translate3d(0, 0, 0) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))",
-              }}
               type="button"
               onClick={openDestination}
               aria-label={experience.ctaLabel ?? "Open experience"}
