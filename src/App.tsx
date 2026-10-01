@@ -69,8 +69,6 @@ function ExperienceRoute() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-
     void loadExperience(
       window.location.pathname,
       window.location.search,
